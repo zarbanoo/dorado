@@ -82,21 +82,23 @@ except Exception:
 """.lstrip()
 
 setup(
-    use_scm_version={
-        'write_to': os.path.join('dorado', 'version.py'),
-        'write_to_template': VERSION_TEMPLATE,
-        "local_scheme": "no-local-version",
-        "version_scheme": "python-simplified-semver"
-                       }
+    version='2.0.0.dev0'
+    # use_scm_version={
+    #     'write_to': os.path.join('dorado', 'version.py'),
+    #     'write_to_template': VERSION_TEMPLATE,
+    #     "local_scheme": "no-local-version",
+    #     "version_scheme": "python-simplified-semver"
+    #                    }
         )
 # where is this file? os.path.dirname(__file__)
 # import  astropy.config as acfg
 # import ./dorado/config
 
 
+# Entry points and automatic script creation
+# Setuptools supports automatic creation of scripts upon installation, that run code within your package if you specify them as entry points. An example of how this feature can be used in pip: it allows you to run commands like pip install instead of having to type python -m pip install.
 
-
-
+# https://setuptools.pypa.io/en/latest/userguide/quickstart.html
 
 
 
