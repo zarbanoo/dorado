@@ -17,14 +17,14 @@ Overview
 .. image:: https://readthedocs.org/projects/dorado/badge/?version=latest
     :target: https://dorado.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
-.. image:: https://img.shields.io/github/last-commit/Mucephie/DORADO
-    :target: https://github.com/Mucephie/DORADO
+.. image:: https://img.shields.io/github/last-commit/zarbanoo/DORADO
+    :target: https://github.com/zarbanoo/DORADO
     :alt: Last Commit
-.. image:: https://img.shields.io/github/issues/Mucephie/DORADO
-    :target: https://github.com/Mucephie/DORADO/issues
+.. image:: https://img.shields.io/github/issues/zarbanoo/DORADO
+    :target: https://github.com/zarbanoo/DORADO/issues
     :alt: GitHub issues
-.. image:: https://img.shields.io/github/v/release/Mucephie/DORADO?include_prereleases
-    :target: https://github.com/Mucephie/DORADO
+.. image:: https://img.shields.io/github/v/release/zarbanoo/DORADO?include_prereleases
+    :target: https://github.com/zarbanoo/DORADO
     :alt: GitHub release (latest by date including pre-releases)
 
 .. image:: https://img.shields.io/pypi/status/dorado
@@ -102,6 +102,19 @@ Reference/API
 =============
 
 .. automodapi:: dorado
+
+API V2
+=============
+.. automodapi:: 
+
+b1
+
+.. automethod::
+
+b2
+
+.. automodapi:: dorado.core
+
 
 Contribute
 ----------

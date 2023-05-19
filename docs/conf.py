@@ -107,8 +107,8 @@ release = package.__version__
 
 html_theme_options = {
     'logotext1': 'Dorado',  # white,  semi-bold
-    'logotext2': 'Draco',   # orange, light
-    'logotext3': ':v2.0.x'  # white,  light
+    'logotext2': 'Bolide',   # orange, light
+    'logotext3': ':v2.0.0'  # white,  light
     }
 
 

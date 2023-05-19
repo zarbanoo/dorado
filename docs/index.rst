@@ -14,13 +14,13 @@ Digitized Observatory Resources for Automated Data Operations
 .. image:: https://readthedocs.org/projects/dorado/badge/?version=latest
     :target: https://dorado.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
-.. image:: https://img.shields.io/github/last-commit/Mucephie/DORADO
+.. image:: https://img.shields.io/github/last-commit/zarbanoo/DORADO
     :target: https://github.com/zarbanoo/dorado
     :alt: Last Commit
-.. image:: https://img.shields.io/github/issues/Mucephie/DORADO
+.. image:: https://img.shields.io/github/issues/zarbanoo/DORADO
     :target: https://github.com/zarbanoo/dorado/issues
     :alt: GitHub issues
-.. image:: https://img.shields.io/github/v/release/Mucephie/DORADO?include_prereleases
+.. image:: https://img.shields.io/github/v/release/zarbanoo/DORADO?include_prereleases
     :target: https://github.com/zarbanoo/dorado
     :alt: GitHub release (latest by date including pre-releases)
 
@@ -44,7 +44,7 @@ Digitized Observatory Resources for Automated Data Operations
 This is the documentation hub  for dorado.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     dorado/index
 
