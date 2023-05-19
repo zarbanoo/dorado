@@ -33,7 +33,7 @@ ast = AstrometryNet()
 Filer is the handler of the Dorado system,
 '''
 
-__all__ = ['Dorado']
+__all__ = ['Dorado', 'Dorado_core']
 
 
 def get_builtins():

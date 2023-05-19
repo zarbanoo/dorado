@@ -22,7 +22,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 
-__all__ = ['aico_reader'] #, 'tess_reader'
+__all__ = ['reader', 'aico_reader'] #, 'tess_reader'
 
 class reader:
     '''

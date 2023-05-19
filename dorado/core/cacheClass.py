@@ -1,3 +1,7 @@
+import os
+
+__all__ = ['mkcacheObj', 'delcacheObj']
+
 def mkcacheObj(self, object, subcache = False):
     """
     mkcacheObj is a convenience function that creates a cache object for a .fits compatable
