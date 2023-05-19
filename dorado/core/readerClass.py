@@ -20,8 +20,81 @@ from tqdm import tqdm
 
 __all__ = ['aico_reader'] #, 'tess_reader'
 
+class reader:
+    '''
+        readers need to have a dirscan method and a savewrok method. Readers should also probably have a mkceres method.
+    '''
+    def __init__(self):
+        # should report to logger and read from config here
+        # will this carry over to inherited classes?
+        self.desired_datatype = 'uint16' # datatype to force onto images
+        
+    def diread(self, dirarray):
+        """
+        diread intakes a filepath array and catalogues the contents by either 'is file' or 'is directory'
+        and returns the resulting lists.
+        
+        Parameters
+        ----------
+        dirarray: str array
+            array containing the path to the desired directory.
+        Returns
+        -------
+        
+        """
+        if isiterable(dirarray):
+            path = Dorado.dordir
+            for dir in dirarray:
+                path = path / dir
+        else:
+            path = dirarray
+        # path = self.dordir / 'data' / 'raw' / date
+        contents = os.scandir(path = path)
+        files = []
+        directories = []
+        for entry in contents:
+            if not entry.name.startswith('.'):
+                if entry.is_file():
+                    files.append(entry)
+                if entry.is_dir():
+                    directories.append(entry)
+        return files, directories
+    
+    def newdat(self):
+        """
+        newdat is an nfinished function that will scan the '$user/.dorado/data/raw' directory
+        for new data to be processed.
+        
+        Parameters
+        ----------
+
+        Returns
+        -------
+        
+        """
+        # find data that hasn't been processed yet
+        print('searching for unprocessed data...')
+    
+    def force16(self, hdu):
+        """
+        An unfinished convinience function for forcing the datatype of CCDData to be 16-bit instead of 32-bit
+        for consistency and filesize optimization.
+        
+        Parameters
+        ----------
+        hdu: CCDData
+            hdu to force 16-bit datatype.
+        Returns
+        -------
+        
+        NOTE:: in the future this will handle arrays of data instead of single HDU's and will allow for specifying the bit datatype.
+        """
+        print('This function is not implemented yet. See mkBias() for example functionality.')
+    
+
+
+
 # TODO Make it so that each class isnt loaded unless chosen (core class takes string and then imports correct class)
-class aico_reader:
     '''
     
     '''
