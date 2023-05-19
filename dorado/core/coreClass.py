@@ -59,11 +59,14 @@ class Dorado_core:
         self.stardir = os.getcwd()
         self.rootname = 'dorado'
         self.config_dir = _config.get_config_dir(self.rootname)
+        # read in config from config_dir
+        
         self.dordir = Path(self.config_dir).parent
         self.init_dir()
         self.unit = un.adu
 
         ## class storage zone -----------------------
+        # redo this so theres an easy storage and readout
         # reader
         self.reader = aico_reader() # ussually we'd want to grab this from a configuration file, should name be aicoReader?
         # dorphot
@@ -119,69 +122,6 @@ class Dorado_core:
             os.makedirs('./data/tess', exist_ok = True)
         self.exit_dordir()
         
-    def newdat(self):
-        """
-        newdat is an nfinished function that will scan the '$user/.dorado/data/raw' directory
-        for new data to be processed.
-        
-        Parameters
-        ----------
-
-        Returns
-        -------
-        
-        """
-        # find data that hasn't been processed yet
-        print('searching for unprocessed data...')
-
-    def get_night(self):
-        """
-        get_night obtains a timestring for the most recent(previous) night based on local/hardware
-        time provided by datetime. The format follows yyyy-mm-(dd-1)+dd where (dd-1) is last nights 
-        day of the month. This currently does not support dates at which the start of the observing
-        night was the last day of the month.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        night: str
-                Timestring for the most recent night.
-        """
-        # currently does not support first/last of the month
-        # option for last night or tonight
-        # UTC or local time?
-        date = datetime.date.today()
-        year = date.year
-        month = date.month
-        day = date.day
-        # date1 = date2 - 1
-        # night = str(year) + '-' + str(month) + '-' + str(date1) + '+' + str(date2)
-
-
-        if day < 10:
-            daystr = '0' + str(day)
-        else:
-            daystr = str(day)
-        if day < 9:
-            day2str = '0' + str(day + 1)
-        else:
-            day2str = str(day + 1)
-        if month < 10:
-            monthstr = '0' + str(month)
-        else:
-            monthstr = str(month)
-
-
-        night = str(year) + '-' + monthstr + '-' + daystr + '+' + day2str
-
-
-
-
-        return night
-        
     def enter_dordir(self):
         """
         enter_dordir changes the workin directory to self.dordir which by default is
@@ -209,37 +149,6 @@ class Dorado_core:
         """
         os.chdir(self.stardir)
         
-    def diread(self, dirarray):
-        """
-        diread intakes a filepath array and catalogues the contents by either 'is file' or 'is directory'
-        and returns the resulting lists.
-        
-        Parameters
-        ----------
-        dirarray: str array
-            array containing the path to the desired directory.
-        Returns
-        -------
-        
-        """
-        if isiterable(dirarray):
-            path = self.dordir
-            for dir in dirarray:
-                path = path / dir
-        else:
-            path = dirarray
-        # path = self.dordir / 'data' / 'raw' / date
-        contents = os.scandir(path = path)
-        files = []
-        directories = []
-        for entry in contents:
-            if not entry.name.startswith('.'):
-                if entry.is_file():
-                    files.append(entry)
-                if entry.is_dir():
-                    directories.append(entry)
-        return files, directories
-    
     def mkceres(self, date, name = None, sub = 'raw', target = None, calibrated = False, aligned = False):
         """
         mkceres is a wrapper function for self.reader.mkceres with an additional arguement for setting the keyname 
@@ -289,140 +198,24 @@ class Dorado_core:
         self.target_keys[name] = len(self.targets)
         self.targets.append(constructor(name))
         
-    def force16(self, hdu):
+    def savewrk(self, cr, filters = None):
         """
-        An unfinished convinience function for forcing the datatype of CCDData to be 16-bit instead of 32-bit
-        for consistency and filesize optimization.
-        
+        savewrk is a wrapper function for self.reader.savewrk.
         Parameters
         ----------
-        hdu: CCDData
-            hdu to force 16-bit datatype.
+
+        self.reader.savewrk args**
         Returns
         -------
         
         """
-        print('This function is not implemented yet. See mkBias() for example functionality.')
-        
-    def mkcacheObj(self, object, subcache = False):
-        """
-        mkcacheObj is a convenience function that creates a cache object for a .fits compatable
-        object in the self.dordir/cache directory.
-        
-        Parameters
-        ----------
-        object: CCDData
-            object to be saved in the cache directory for access.
-        subcache: str
-            optional subcache file for cache organization. Optional
-        Returns
-        -------
-        
-        """
-        if subcache:
-            cachedir = self.dordir / 'cache' / subcache
-            dirarray = ['cache', subcache]
-        else:
-            cachedir = self.dordir / 'cache' 
-            dirarray = ['cache']
-        # if isiterable(object):
-        #     # print('This function does not currently support iterable objects.')
-        #     return warnings.WarningMessage('This function does not currently support iterable objects.')
-        # else:
-        #     files, _ = self.diread(dirarray)
-        #     fname = 'cache_object_' + str(len(files) + 1) + '.fits'
-        #     object.write(fname)
-        #     return(fname, cachedir)
+        self.reader.savewrk(cr, filters)
 
-        # check if iterable
-        files, _ = self.diread(dirarray)
-        fname = 'cache_object_' + str(len(files) + 1) + '.fits'
+    # logic to set reader and dorphot
         
-        object.write(cachedir / fname, overwrite = True)
-        return(fname, cachedir)
         
-    def delcacheObj(self, fname, subcache = False):
-        """
-        delcacheObj is a convenience method that deletes a selected cache object given is file name.
         
-        Parameters
-        ----------
-        fname: string
-            filestring of cache object to delete.
-        subcache: string
-            filestring of subcache containing the cache object to delete.
-        Returns
-        -------
-        
-        """
-        # TODO extend to clearing cache
-        if subcache:
-            cachedir = self.dordir / 'cache' / subcache
-        else:
-            cachedir = self.dordir / 'cache'
-
-        os.remove(cachedir / fname)
-        
-    def plate_solve(self, dirarray, data = None, writearray = False):
-        """
-        plate_solve takes a dirarray pointing to a fits file to plate solve using astrometryNet. It returns
-        the solved image with the WCS header and the WCS header itself if the solve succeeded. If 'writearray'
-        is set with a filepath array, a copy of the solved image will be saved.
-        
-        Parameters
-        ----------
-        dirarray: str array
-            filepath array to image to be solved.
-        data: CCDData
-            optional image data to combine with the WCS header on return.save. Default is data to be solved.
-        Returns
-        -------
-        
-        """
-        path = self.dordir
-        for dir in dirarray:
-            path = path / dir
-
-        if data == None:
-            data = CCDData.read(path) #, unit = Dorado.unit) ## NOTE edited
-
-        trying = True
-        submission_id = None
-        num = 0
-
-        while trying:
-                try:
-                    if not submission_id:
-                        wcs_header = ast.solve_from_image(path, force_image_upload=True, submission_id=submission_id, solve_timeout=300)
-                    else:
-                        print('Monitoring: try #', num)
-                        wcs_header = ast.monitor_submission(submission_id, solve_timeout=300)
-                except TimeoutError as e:
-                    print(TimeoutError)
-                    num = num + 1
-                    print('Timed out: try #', num)
-                    submission_id = e.args[1]
-
-                if wcs_header != None:
-                    # got a result, so terminate while loop
-                    trying = False
-        if wcs_header:
-            # Code to execute when solve succeeds
-            print('Solve succeeded! :)')
-            wcs_hdu = data
-            wcs_hdu.header = wcs_header
-            if writearray:
-                path = self.dordir
-                for dir in writearray:
-                    path = path / dir
-                wcs_hdu.write(path, overwrite = True)
-
-            return wcs_hdu, wcs_header
-        else:
-            # Code to execute when solve fails
-            print('Solve failed! :(')
-            return 
-
+    # move to ceres
     def getDateString(self, cr, utc = None):
         """
         getDateString computes the date string for the given ceres object. ceres time is represented
@@ -504,6 +297,7 @@ class Dorado_core:
         datestr = str(epoch['year']) + '-' + month + '-' + day + '+' + day2
         self.ceres[self.ceres_keys[cr]].datestr = datestr
         
+    # move to reader
     def mkwrk(self, cr):
         """
         mkwrk produces a working folder for saving a ceres object to the dorado data working directory
@@ -528,20 +322,8 @@ class Dorado_core:
         os.makedirs(wrkdir / datestr / 'uncalibrated', exist_ok = True)
         os.makedirs(wrkdir / datestr / 'WCS', exist_ok = True)
         # figures, targets, log, omitted images, observation metadata
-        
-    def savewrk(self, cr, filters = None):
-        """
-        savewrk is a wrapper function for self.reader.savewrk.
-        Parameters
-        ----------
 
-        self.reader.savewrk args**
-        Returns
-        -------
-        
-        """
-        self.reader.savewrk(cr, filters)
-        
+    # move to utils or reader
     def saveWCS(self, cr, filters = None):
         """
         saveWCS takes a ceres object and an optional filters argument and saves the contained WCS
@@ -575,6 +357,7 @@ class Dorado_core:
             solved.write(wrkdir / datestr / 'WCS' / fname, overwrite = True)
         # not done might be redundant atm also shouldnt this belong to reader?
     
+    # move to ceres or reader
     def saveBase(self, cr, filters = None):
         """
         saveBase save the base frame of a ceres object if any.
@@ -621,46 +404,5 @@ G['Dorado'] = Dorado
 # dorado by closest mjd)
 # if there is no calibration files in dorado send a warning and set 
 # calibration files to none
+# handle multi filter
 
-# make a function to force uint16
-
-
-
-
-# if aligned:
-            #     dirarray = ['data', sub, date, 'aligned']
-            # elif calibrated:
-            #     dirarray = ['data', sub, date, 'calibrated']
-            # else:
-            #     dirarray = ['data', sub, date]
-            # biasIFC, flats, lights = self.dirscan(dirarray)
-            # print(len(flats), ' flats found.')
-            # print(len(biasIFC), ' bias frames found.')
-            # print(len(lights), ' lights found')
-            
-            
-
-            # # save these frames
-            # ## TODO :: get missing calibraation files
-
-            # ## TODO :: look into UTC wrecking stuff
-            # if len(biasIFC) == 0:
-            #     cere = Ceres(time = Time(lights[0].header['DATE-OBS'], format='fits'))
-            #     self.getDateString(cere)
-            # else:
-            #     bias = self.mkBias(biasIFC)
-            #     cere = Ceres(bias = bias, time = Time(lights[0].header['DATE-OBS'], format='fits'))
-            #     self.getDateString(cere)
-
-            # # for f in filter_data:
-            # # cere.flats[flat.header['filter']] = flat
-
-            # ## TODO :: multifilter fun
-            # if len(flats) == 0:
-            #      cere.add_stack(Stack(lights, calibrated = calibrated, aligned = aligned, target = target))
-            # else:
-            #     flat = self.mkFlat(flats)
-            #     cere.add_stack(Stack(lights, flat = flat, calibrated = calibrated, aligned = aligned, target = target))
-            
-
-            # return cere
