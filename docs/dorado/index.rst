@@ -105,15 +105,20 @@ Reference/API
 
 API V2
 =============
-.. automodapi:: 
-
-b1
-
-.. automethod::
-
-b2
 
 .. automodapi:: dorado.core
+
+API V3
+=============
+
+.. automodapi:: dorado
+    :undoc-members:
+
+API V4
+=============
+
+.. autosummary:: dorado
+    :recursive:
 
 
 Contribute
