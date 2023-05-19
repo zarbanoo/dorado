@@ -472,7 +472,43 @@ class aico_reader(reader):
                 fname = fplate + str(p) + '_' + tstr + fsub + '.fits'
                 image.write(wrdir / fname, overwrite = True)
 
-
+    def getBias(self, mjdstr):
+        # NOTE This function does not account for binning/image size
+        target_mjd = int(mjdstr)
+        biasdir = Dorado.dordir / 'data' / 'bias' 
+        contents = os.scandir(path = biasdir)
+        candidates = []
+        for entry in contents:
+            entry_mjd = int(entry.name[0:4]) # grab first five characters of filename. Should be the mjd number
+            if np.abs(target_mjd - entry_mjd) <= self.calibration_window:
+                candidates.append(entry_mjd)
+        if len(candidates) == 0:
+            print('No viable bias frames found. Try increasing your calibration window.')
+        else:
+            mjd_to_use = candidates[np.argmin(candidates- entry_mjd)] #locate the mjd of the closest file in time
+        
+        fname = str(mjd_to_use) + '_Bias.fits'
+        bias = CCDData.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
+        return bias
+    
+    def getFlat(self, mjdstr, phi):
+        target_mjd = int(mjdstr)
+        flatdir = Dorado.dordir / 'data' / 'flats' 
+        contents = os.scandir(path = flatdir)
+        candidates = []
+        for entry in contents:
+            if phi in entry.name:
+                entry_mjd = int(entry.name[0:4]) # grab first five characters of filename. Should be the mjd number
+                if np.abs(target_mjd - entry_mjd) <= self.calibration_window:
+                    candidates.append(entry_mjd)
+        if len(candidates) == 0:
+            print('No viable flat frames found. Try increasing your calibration window or using a different filter.')
+        else:
+            mjd_to_use = candidates[np.argmin(candidates- entry_mjd)]
+        
+        fname = str(mjd_to_use) + '_' + str(phi) + '_flat.fits'
+        flat = CCDData.read(flatdir / fname) #, unit = Dorado.unit) ## NOTE edited
+        return flat
 
 # class tess_reader:
 #     def __init__(self):
