@@ -214,6 +214,24 @@ class aico_reader(reader):
             # People need to adopt a standard way of saving stuff or I will go nuts trying to come up with all the different ways they can organize(or disorganize) their data.
             return self._multi_level_top(files, directories) # what if there is usable data in single level and we only search multi-level
         
+    def _chkPhi(self, stack_files):
+        # sequence through headers saving every filter keyword
+        phi_list = []
+        phi_stacks = {}
+        for im in stack_files:
+            phi = im.header['FILTER'] # hardcoded filter keyword for now
+            if phi in phi_list: # check if filter is already accounted for 
+                phi_stacks[phi].append(im)
+            else:
+                phi_stacks[phi] = [im]
+        for p in phi_list:
+            print('Found ', len(phi_stacks[p]), ' ', p, ' frames.')
+        # Should we go ahead and construct stacks first before returning?
+        return phi_list, phi_stacks
+
+    def _chkCal(self):
+        pass
+    
     def mkceres(self,  date, sub = 'raw', target = None, calibrated = False, aligned = False):
             '''
             mkceres creates a ceres object from a given datestring for an observation and an optional 
@@ -267,8 +285,28 @@ class aico_reader(reader):
             else:
                 bias = self.getBias(mjdstr) # find bias that are near in time
                 
+            # lets split the lights into filters
+            phi_list, phi_stacks = self._chkPhi(lights)
             
-
+            # lets split the flats into filters
+            if len(flats) > 0:
+                phi_flat_list, phi_flat_stacks = self._chkPhi(flats)
+                for f in phi_flat_list:
+                    flat[f] = self.mkFlat(phi_flat_stacks[f])
+            for phi in phi_list: # This is not a very stable section, needs some love later to handle niche cases
+                # find missing flats near in time to data
+                if phi not in phi_flat_list:
+                    phi_flat = self.getFlat(mjdstr, phi)
+                    flat[phi] = phi_flat
+            
+            # Construct cere class
+            cere = Ceres(time = Time(epoch, format='fits'), datestr=datestr)
+            cere.bias = bias
+                    
+            # Construct stacks and hand them to Ceres
+            for phi in phi_list:
+                cere.add_stack(Stack(phi_stacks[phi], flat = flat[phi],  calibrated = calibrated, aligned = aligned, target = target))
+                
             return cere
         
     def mkFlat(self, flats):
