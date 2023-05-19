@@ -102,23 +102,30 @@ Reference/API
 =============
 
 .. automodapi:: dorado
+    :undoc-members:
+    :no-inheritance-diagram:
 
 API V2
 =============
 
 .. automodapi:: dorado.core
+    :undoc-members:
+    :no-inheritance-diagram:
 
 API V3
 =============
 
 .. automodapi:: dorado
     :undoc-members:
+    :no-inheritance-diagram:
 
 API V4
 =============
 
 .. autosummary:: dorado
     :recursive:
+    :undoc-members:
+    :no-inheritance-diagram:
 
 
 Contribute
