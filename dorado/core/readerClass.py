@@ -99,11 +99,86 @@ class reader:
 
 
 # TODO Make it so that each class isnt loaded unless chosen (core class takes string and then imports correct class)
+class aico_reader(reader):
     '''
     
     '''
     def __init__(self):
-        self.temp = None
+        self.biasstr = ['Bias', 'Bias', 'bias', 'BIAS']
+        self.flatsstr = ['FLAT', 'FlatField', 'flat', 'Flat', 'Flats', 'flats', 'FLATS', 'FlatFields']
+        self.lightsstr = ['lights', 'Lights', 'LIGHTS']
+        self.stack_types = {'bias':self.biasstr, 'flats':self.flatsstr, 'lights':self.lightsstr}
+        self.unique_lights = True # whether to find lights by non calibration files (True) or via self.lightstr (False)
+        self.require_cal = False  # whether calibration frames are essential, this should be dynamically set by the read calibration level
+        
+    def _single_level(self, files):
+        bias    = self._read_stack(files, 'bias')
+        flats  = self._read_stack(files, 'flats')
+        lights = self._read_stack(files, 'lights')
+        return bias, flats, lights
+        
+    def _multi_level_top(self, files, directories):
+        biasdir = [s for s in directories if s.name in self.biasstr]
+        # There should never be multiple bias directories; unless bias were taken with multiple binning settings or taken multiple times.
+        # Consult chief data officer about this. TODO
+        bias_files, _ = self.diread(biasdir[0])
+        bias    = self._read_stack(bias_files, 'bias')
+        # It is possible to have multiple flats directories for different filters, they should all be contained in a single base flats directory tho
+        flatsdir = [s for s in directories if s.name in self.flatsstr]
+        flats = self._multi_level_sub(flatsdir[0], 'flats')
+        if self.unique_lights:
+            lightsdir = [s for s in directories if (s.name not in self.flatsstr) and (s.name not in self.biasstr)] # may hand back more than one directory
+        else:
+            lightsdir = [s for s in directories if s.name in self.lightsstr]  # may hand back more than one directory
+        lights = self.multi_level_sub(lightsdir[0], 'lights')
+        return bias, flats, lights
+
+    def _multi_level_sub(self, subdir, stack_type):
+        files, directories = self.diread(subdir)
+        sub_files = []
+        if len(directories) == 0:
+            print('Single directory ', stack_type, ' organization format detected.')
+            sub_files  = self._read_stack(files, stack_type)
+        elif len(files) == 0:
+            print('Multi directory ', stack_type, ' organization format detected.')
+            for d in directories:
+                # should not be any further sub folders
+                f, _ = self.diread(d)
+                sub_files += self._read_stack(f, stack_type) # should we continue to hand stack_type if only the desired frame type should be present this deep in the mix?
+        return sub_files
+            
+    def _read_stack(self, files, stack_type):
+        if (stack_type == 'lights') & (self.unique_lights):
+            stackstr = self.stack_types['bias'] + self.stack_types['flats'] # NOTE:: in the future this should be modded to include all non light stack types.
+        else:
+            try:
+                stackstr = self.stack_types[stack_type]
+            except:
+                stackstr = stack_type
+            
+        stack_list = []
+        for st in stackstr:
+            for s in files:
+                if (stack_type == 'lights') & (self.unique_lights):
+                    if (str(st)) not in str(s.name):
+                        stack_list.append(s)
+                else:
+                    if (str(st)) in str(s.name):
+                        stack_list.append(s)
+        stack_files = []
+        if len(stack_list) > 50:
+            n = 0 # this is a very janky way of writing this, enjoy
+            for f in (pbar := tqdm(stack_list, colour = 'green')):
+                n += 1
+                pbar.set_description('Reading ' + stack_type + ' : ' + str(n))
+                pbar.refresh()
+                hdu = CCDData.read(f.path)
+                stack_files.append(hdu)
+        else:
+            for f in stack_list:
+                hdu = CCDData.read(f.path)
+                stack_files.append(hdu)
+        return stack_files
 
     def dirscan(self, dirarray):
         '''
@@ -124,126 +199,20 @@ class reader:
             path = path / dir
         files, directories = Dorado.diread(path)
 
-        biasstr = ['Bias', 'Bias', 'bias', 'BIAS']
-
-        flatsstr = ['FLAT', 'FlatField', 'flat', 'Flat', 'Flats', 'flats', 'FLATS', 'FlatFields']
-        
-        lightsstr = ['lights', 'Lights', 'LIGHTS']
-
+        # TODO check if files are actually fits files before we break the fits reader
         if len(directories) == 0:
             if len(files) == 0:
                 raise Exception('No viable data found')
 
             else:
                 print('Single directory level organization format detected.')
-                # print('Reading files.')
-                # compile these into master frame and pass them to Filer
-                # path = self.dordir / 'data' / 'raw' / date
-                biasl = []
-                for strbias in biasstr:
-                    for s in files:
-                        if (str(strbias)) in str(s.name):
-                            biasl.append(s)
-                bias = []
-                for i in range(len(biasl)):
-                    hdu = CCDData.read(biasl[i].path) #, unit = Dorado.unit) ## NOTE edited
-                    bias.append(hdu)
-                # print('Bias searched.')
-                flatsl = []
-                for strflat in flatsstr:
-                    for s in files:
-                        if strflat in s.name:
-                            flatsl.append(s)
-                flats = []
-                for i in flatsl:
-                    hdu = CCDData.read(i.path) #, unit = Dorado.unit) ## NOTE edited
-                    flats.append(hdu)
-                # print('flats searched.')
-                # strip into ceres (check if multi-filter)
-                lightsl = []
-                nonlight = []
-                for b in biasl:
-                    nonlight.append(b.name)
-                for f in flatsl:
-                    nonlight.append(f.name)
-
-                for s in files:
-                    if (str(s.name) not in nonlight):
-                        lightsl.append(s)
-
-                # lightsl = [s for s in files if (s.name not in biasl) and (s.name not in flatsl)]
-                lights = []
-                print('Reading lights...')
-                for i in tqdm(lightsl, colour = 'green'):
-                    hdu = CCDData.read(i.path) #, unit = Dorado.unit) ## NOTE edited
-                    ## Trying to enforce 16bit data instead of 32 or 64
-                    hdu.data = hdu.data.astype('uint16')
-                    lights.append(hdu)
-                # print('lights searched.')
-                return bias, flats, lights
+                return self._single_level(files)
 
 
         elif len(files) == 0:
             print('Multi directory level organization format detected.')
-            # print('Reading directories.')
-            # read into this and compile into master bias, pass to Filer
-            biasdir = [s for s in directories if s.name in biasstr]
-            # check if multifilter, compile, pass to Filer
-            flatsdir = [s for s in directories if s.name in flatsstr]
-            # check if multifilter (or subdirectories) and pass to ceres
-            lightsdir = [s for s in directories if (s.name not in flatsstr) and (s.name not in biasstr)]
-            biasl, _ = Dorado.diread(biasdir[0])
-            bias = []
-            for i in biasl:
-                hdu = CCDData.read(i.path) #, unit = Dorado.unit) ## NOTE edited
-                bias.append(hdu)
-
-
-            for ldir in lightsdir:
-                files, directories = Dorado.diread(ldir)
-                if len(directories) == 0:
-                    if len(files) == 0:
-                        raise Exception('No viable light data found')
-                    else:
-                        print('Single directory lights organization format detected.')
-                        # print('Reading files.')
-                        lights = []
-                        print('Reading lights...')
-                        for i in tqdm(files, colour = 'green'):
-                            hdu = CCDData.read(i.path) #, unit = Dorado.unit) ## NOTE edited
-                            ## Trying to enforce 16bit data instead of 32 or 64
-                            hdu.data = hdu.data.astype('uint16')
-                            lights.append(hdu)
-                        # filter = ImageFileCollection(ldir).values('filter', unique = True)
-                        # lights = [filter, lightsarr]
-
-                        
-                elif len(files) == 0:
-                    print('Multi directory lights organization format detected.')
-                    # print('Reading directories.')
-                    lights = []
-
-
-
-            for fdir in flatsdir:
-                files, directories = Dorado.diread(fdir)
-                if len(directories) == 0:
-                    if len(files) == 0:
-                        raise Exception('No viable light data found')
-                    else:
-                        print('Single directory flats organization format detected.')
-                        # print('Reading files.')
-                        flats = []
-                        for i in files:
-                            hdu = CCDData.read(i.path) #, unit = Dorado.unit) ## NOTE edited
-                            flats.append(hdu)
-
-                elif len(files) == 0:
-                    print('Multi directory flats organization format detected.')
-                    # print('Reading directories.')
-                    flats = []
-
-            return bias, flats, lights
+            # People need to adopt a standard way of saving stuff or I will go nuts trying to come up with all the different ways they can organize(or disorganize) their data.
+            return self._multi_level_top(files, directories) # what if there is usable data in single level and we only search multi-level
         
     def mkceres(self,  date, sub = 'raw', target = None, calibrated = False, aligned = False):
             '''
@@ -280,37 +249,24 @@ class reader:
             else:
                 dirarray = ['data', sub, date]
 
-            biasIFC, flats, lights = self.dirscan(dirarray)
+            biases, flats, lights = self.dirscan(dirarray)
 
             print(len(flats), ' flats found.')
-            print(len(biasIFC), ' bias frames found.')
+            print(len(biases), ' bias frames found.')
             print(len(lights), ' lights found')
-            
-            
-
-            # save these frames
-            ## TODO :: get missing calibraation files
-            ## if data aligned or calibrated, cal frames arent needed
-
-            ## TODO :: look into UTC wrecking stuff
-            if len(biasIFC) == 0:
-                cere = Ceres(time = Time(lights[0].header['DATE-OBS'], format='fits'))
-                ## TODO get date string is in filer
-                # self.getDateString(cere)
+            if len(lights) > 0:
+                epoch = lights[0].header['DATE-OBS']
+                datestr = utils.getDateString(epoch) # TODO import this
+                mjdstr  = str(np.round(Time(epoch, format='fits').mjd))
             else:
-                bias = self.mkBias(biasIFC)
-                cere = Ceres(bias = bias, time = Time(lights[0].header['DATE-OBS'], format='fits'))
-                # self.getDateString(cere)
+                raise Exception("No usable lights found") # NOTE user may want to run calibration files without lights, or have lights without calibration files
 
-            # for f in filter_data:
-            # cere.flats[flat.header['filter']] = flat
-
-            ## TODO :: multifilter fun
-            if len(flats) == 0:
-                cere.add_stack(Stack(lights, calibrated = calibrated, aligned = aligned, target = target))
+            # Get Base Bias
+            if len(biases) > 0:
+                bias = self.mkBias(biases)
             else:
-                flat = self.mkFlat(flats)
-                cere.add_stack(Stack(lights, flat = flat, calibrated = calibrated, aligned = aligned, target = target))
+                bias = self.getBias(mjdstr) # find bias that are near in time
+                
             
 
             return cere
