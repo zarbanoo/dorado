@@ -4,19 +4,23 @@ warnings.filterwarnings('ignore')
 from ..ceres import Ceres
 from ..stack import Stack
 from ..core.coreClass import *
+from ..core import utils
 
+# import utils
 import ccdprocx
 
 from astropy.nddata.ccddata import CCDData
 CCDData._config_ccd_requires_unit = False
 from astropy.time import Time
 from astropy.io import fits
+from astropy.utils.misc import isiterable
 
 import lightkurve as lk
 from lightkurve.lightcurve import TessLightCurve as tlc
 
 import os
 from tqdm import tqdm
+import numpy as np
 
 __all__ = ['aico_reader'] #, 'tess_reader'
 
