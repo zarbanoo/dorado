@@ -7,5 +7,7 @@ __all__ = []
 
 from .coreClass import *
 from .readerClass import *
+from .utils import *
 __all__ += coreClass.__all__
 __all__ += readerClass.__all__
+__all__ += utils.__all__
