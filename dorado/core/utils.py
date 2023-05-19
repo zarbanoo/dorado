@@ -5,7 +5,7 @@ from astropy.wcs import WCS
 
 ast = AstrometryNet()
 
-__all__ =  ['plate_solve', 'get_night', 'get_DateString']
+__all__ =  ['plate_solve', 'get_night', 'getDateString']
 
 
 def plate_solve(dirarray, data = None, writearray = False):
