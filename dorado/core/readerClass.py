@@ -4,7 +4,7 @@ warnings.filterwarnings('ignore')
 from ..ceres import Ceres
 from ..stack import Stack
 from ..core.coreClass import *
-from ..core import utils
+from ..core.utils import *
 
 # import utils
 import ccdprocx
@@ -275,7 +275,7 @@ class aico_reader(reader):
             print(len(lights), ' lights found')
             if len(lights) > 0:
                 epoch = lights[0].header['DATE-OBS']
-                datestr = utils.getDateString(epoch) # TODO import this
+                datestr = getDateString(epoch) # TODO import this
                 mjdstr  = str(np.round(Time(epoch, format='fits').mjd))
             else:
                 raise Exception("No usable lights found") # NOTE user may want to run calibration files without lights, or have lights without calibration files
