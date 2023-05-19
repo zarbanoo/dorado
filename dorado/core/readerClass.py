@@ -110,6 +110,7 @@ class aico_reader(reader):
         self.stack_types = {'bias':self.biasstr, 'flats':self.flatsstr, 'lights':self.lightsstr}
         self.unique_lights = True # whether to find lights by non calibration files (True) or via self.lightstr (False)
         self.require_cal = False  # whether calibration frames are essential, this should be dynamically set by the read calibration level
+        self.calibration_window = 7
         
     def _single_level(self, files):
         bias    = self._read_stack(files, 'bias')
@@ -289,6 +290,7 @@ class aico_reader(reader):
             phi_list, phi_stacks = self._chkPhi(lights)
             
             # lets split the flats into filters
+            flat = {}
             if len(flats) > 0:
                 phi_flat_list, phi_flat_stacks = self._chkPhi(flats)
                 for f in phi_flat_list:
