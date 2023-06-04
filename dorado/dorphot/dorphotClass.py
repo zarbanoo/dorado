@@ -83,7 +83,7 @@ class aicoPhot:
                     print('Failed to open ccdproc. Is it installed?')
         for im in tqdm(stack.data, colour = 'green'):
             # bar.update()
-            im.data = im.data.astype('uint16') 
+            im.data   = im.data.astype('uint16') 
             flat.data = flat.data.astype('uint16') 
             bias.data = bias.data.astype('uint16') 
             im = ccdprocx.ccd_process(im, master_bias = bias, master_flat = flat)
@@ -95,7 +95,9 @@ class aicoPhot:
                 im = ccdprocx.cosmicray_median(im, rbox = rb)
             if use_lac_cr_removal:
                 im == ccdproc.cosmicray_lacosmic(im)
-            im.data = im.data.astype('uint16') 
+            im.data        = im.data.astype('uint16') 
+            im.mask        = im.mask.astype('uint16') 
+            im.uncertainty = im.uncertainty.astype('uint16') 
             c_series.append(im)
         # add more flags for header
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].data = c_series
@@ -167,7 +169,7 @@ class aicoPhot:
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(wcs_header)
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = solved
     
-    def align(self, cr, filter, alignto = None, getWCS = True, cache = False, ds = 2, ma = 5):
+    def align(self, cr, filter, alignto = None, getWCS = True, cache = False, ds = 2, ma = 5, clear_cache = True):
         '''
         align aligns a filter stack within a specified ceres object to a specified frame (default is first
         frame). align can optionally retrieve the corresponding WCS data for the aligned stack.
@@ -206,12 +208,14 @@ class aicoPhot:
                 hdulist.close()
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = toalign
             else:
-                fname, cachedir = Dorado.mkcacheObj(toalign, 'astrometryNet')
+                fname, cachedir = Dorado.cache.mkcacheObj(toalign, 'astrometryNet')
                 path = [cachedir, fname]
                 writearray = [cachedir, 'solved.fits']
-                solved, wcs_header = Dorado.plate_solve(path, writearray = writearray)
+                from ..core.utils import plate_solve
+                solved, wcs_header = plate_solve(path, writearray = writearray)
                 toalign = solved
-                Dorado.delcacheObj( fname, 'astrometryNet')
+                if clear_cache:
+                    Dorado.cache.delcacheObj( fname, 'astrometryNet')
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(wcs_header)
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = solved
                 # delete cache object
@@ -340,7 +344,7 @@ class aicoPhot:
         # TODO accomodate targets embedded in core (list of targets)
         # TODO the name for this function needs updating
         
-    def mkBase(self, cr, filter, sigClip = False, minmax = False):
+    def mkBase(self, cr, filter, sigClip = False, minmax = False, mmcmip = 0.1, mmcmap = 0.9):
         '''
         mkBase stacks filter data within a ceres object to produce a base or 'average' stacked image.
         
@@ -358,14 +362,18 @@ class aicoPhot:
         ## TODO :: add the option to change the combination method. Right now default is 
         # sigma clipped median combination.
         series = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
+        mi, ma = np.min(series.data[0]), np.max(series.data[0])
+        di = ma - mi
+        mmcmi, mmcma = mi + (mmcmip * di), ma + (mmcmap * di)
         # toalign = series.data[series.alignTo]
+        base = ccdprocx.combine(series.data,method='median',mem_limit=2e9, sigma_clip=sigClip, minmax_clip=minmax,minmax_clip_min=mmcmi, minmax_clip_max=mmcma)
 
-        c = ccdprocx.Combiner(series.data)
-        if minmax:
-            c.minmax_clipping(min_clip = 0.1)
-        if sigClip:
-            c.sigma_clipping()
-        base = c.median_combine()
+        # c = ccdprocx.Combiner(series.data)
+        # if minmax:
+        #     c.minmax_clipping(min_clip = 0.1)
+        # if sigClip:
+        #     c.sigma_clipping()
+        # base = c.median_combine()
         base.header['stacked'] = True
         base.header['numsubs'] = len(series.data)
         base.header['DATE-OBS'] = series.data[0].header['DATE-OBS']
@@ -393,8 +401,8 @@ class aicoPhot:
         norm = ImageNormalize(stretch=SqrtStretch())
         sigma_clip = SigmaClip(sigma=3.)
         bkg_estimator = MedianBackground()
-        bkg = Background2D(img, (50, 50), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
-        base = img
+        bkg = Background2D(img, (50, 50), filter_size=(5, 5), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
+        base = img.copy()
         base.data = img.data / bkg.background.value
         base.data[np.isnan(base.data)] = 0
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].base = base
@@ -714,6 +722,45 @@ class dracoPhot:
         sc.add_compass()
         sc.add_scale()
         sc.plot()
+        
+    def mkBase(self, cr, filter, sigClip = False, minmax = False, mmcmip = 0.1, mmcmap = 0.9):
+        '''
+        mkBase stacks filter data within a ceres object to produce a base or 'average' stacked image.
+        
+        Parameters
+        ----------
+        cr: string
+            The relevent name string of Ceres instance to create a base stacked image for.
+        filter: str
+            String representation of the relevent filter.
+        sigClip: boolean
+
+        minmax: boolean
+
+        '''
+        ## TODO :: add the option to change the combination method. Right now default is 
+        # sigma clipped median combination.
+        series = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
+        mi, ma = np.min(series.data[0]), np.max(series.data[0])
+        di = ma - mi
+        mmcmi, mmcma = mi + (mmcmip * di), ma + (mmcmap * di)
+        # toalign = series.data[series.alignTo]
+        base = ccdprocx.combine(series.data,method='median',mem_limit=2e9, sigma_clip=sigClip, minmax_clip=minmax,minmax_clip_min=mmcmi, minmax_clip_max=mmcma)
+
+        # c = ccdprocx.Combiner(series.data)
+        # if minmax:
+        #     c.minmax_clipping(min_clip = 0.1)
+        # if sigClip:
+        #     c.sigma_clipping()
+        # base = c.median_combine()
+        base.header['stacked'] = True
+        base.header['numsubs'] = len(series.data)
+        base.header['DATE-OBS'] = series.data[0].header['DATE-OBS']
+        base.header['filter'] = series.filter
+
+        Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].base = base
+        ## TODO :: sort out what is in the header of this base file.
+
 
 
 
