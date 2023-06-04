@@ -9,8 +9,9 @@ from ..core.utils import *
 # import utils
 import ccdprocx
 
-from astropy.nddata.ccddata import CCDData
-CCDData._config_ccd_requires_unit = False
+# from astropy.nddata.ccddata import CCDData
+# CCDData._config_ccd_requires_unit = False
+import astropy.units as un
 from astropy.time import Time
 from astropy.io import fits
 from astropy.utils.misc import isiterable
@@ -122,30 +123,48 @@ class aico_reader(reader):
         biasdir = [s for s in directories if s.name in self.biasstr]
         # There should never be multiple bias directories; unless bias were taken with multiple binning settings or taken multiple times.
         # Consult chief data officer about this. TODO
-        bias_files, _ = self.diread(biasdir[0])
-        bias    = self._read_stack(bias_files, 'bias')
+        if len(biasdir) > 0:
+            bias_files, _ = self.diread(biasdir[0])
+            bias    = self._read_stack(bias_files, 'bias')
+        else:
+            bias = []
         # It is possible to have multiple flats directories for different filters, they should all be contained in a single base flats directory tho
         flatsdir = [s for s in directories if s.name in self.flatsstr]
-        flats = self._multi_level_sub(flatsdir[0], 'flats')
+        if len(flatsdir) > 0:
+            flats = self._multi_level_sub(flatsdir[0], 'flats')
+        else:
+            flats = []
         if self.unique_lights:
             lightsdir = [s for s in directories if (s.name not in self.flatsstr) and (s.name not in self.biasstr)] # may hand back more than one directory
         else:
             lightsdir = [s for s in directories if s.name in self.lightsstr]  # may hand back more than one directory
-        lights = self.multi_level_sub(lightsdir[0], 'lights')
+        if len(lightsdir) > 0: # should also handle more than one rogue dir
+            lights = self._multi_level_sub(lightsdir[0], 'lights')
+        else:
+            lights = []
         return bias, flats, lights
 
     def _multi_level_sub(self, subdir, stack_type):
         files, directories = self.diread(subdir)
         sub_files = []
-        if len(directories) == 0:
+        if len(directories) == 0 & len(files) > 0:
             print('Single directory ', stack_type, ' organization format detected.')
             sub_files  = self._read_stack(files, stack_type)
-        elif len(files) == 0:
+        elif len(files) == 0 & len(directories) > 0:
             print('Multi directory ', stack_type, ' organization format detected.')
             for d in directories:
                 # should not be any further sub folders
                 f, _ = self.diread(d)
                 sub_files += self._read_stack(f, stack_type) # should we continue to hand stack_type if only the desired frame type should be present this deep in the mix?
+        elif len(files) == 0 & len(directories) == 0:
+            print('No', stack_type, '  detected.')
+        else:
+            print('Mix directory ', stack_type, ' organization format detected.')
+            sub_files  = self._read_stack(files, stack_type)
+            for d in directories:
+                # should not be any further sub folders
+                f, _ = self.diread(d)
+                sub_files += self._read_stack(f, stack_type)
         return sub_files
             
     def _read_stack(self, files, stack_type):
@@ -158,14 +177,19 @@ class aico_reader(reader):
                 stackstr = stack_type
             
         stack_list = []
-        for st in stackstr:
-            for s in files:
+        for s in files:
+            good = True # janky way of making sure we dont double up when a few str dont match
+            for st in stackstr:
                 if (stack_type == 'lights') & (self.unique_lights):
-                    if (str(st)) not in str(s.name):
-                        stack_list.append(s)
+                    if (str(st)) in str(s.name):
+                        good = False
+                        
                 else:
                     if (str(st)) in str(s.name):
                         stack_list.append(s)
+            if (stack_type == 'lights') & (self.unique_lights):
+                if good:
+                    stack_list.append(s)
         stack_files = []
         if len(stack_list) > 50:
             n = 0 # this is a very janky way of writing this, enjoy
@@ -173,12 +197,14 @@ class aico_reader(reader):
                 n += 1
                 pbar.set_description('Reading ' + stack_type + ' : ' + str(n))
                 pbar.refresh()
-                hdu = CCDData.read(f.path)
+                hdu = CCDDatax.read(f.path)
+                stack_files.append(hdu)
+        elif len(stack_list) > 0:
+            for f in stack_list:
+                hdu = CCDDatax.read(f.path)
                 stack_files.append(hdu)
         else:
-            for f in stack_list:
-                hdu = CCDData.read(f.path)
-                stack_files.append(hdu)
+            raise Exception('Error locating files: ', stack_type, ' not found.')
         return stack_files
 
     def dirscan(self, dirarray):
@@ -198,7 +224,7 @@ class aico_reader(reader):
         path = Dorado.dordir
         for dir in dirarray:
             path = path / dir
-        files, directories = Dorado.diread(path)
+        files, directories = self.diread(path)
 
         # TODO check if files are actually fits files before we break the fits reader
         if len(directories) == 0:
@@ -224,6 +250,7 @@ class aico_reader(reader):
             if phi in phi_list: # check if filter is already accounted for 
                 phi_stacks[phi].append(im)
             else:
+                phi_list.append(phi)
                 phi_stacks[phi] = [im]
         for p in phi_list:
             print('Found ', len(phi_stacks[p]), ' ', p, ' frames.')
@@ -261,6 +288,7 @@ class aico_reader(reader):
             
             # TODO needs ability to handle multifilter directories
             # TODO auto handle setting 'wrk' as subfolder
+            # TODO ignore looking for calibration files if calibrated or aligned 
             if aligned:
                 dirarray = ['data', sub, date, 'aligned']
             elif calibrated:
@@ -270,34 +298,43 @@ class aico_reader(reader):
 
             biases, flats, lights = self.dirscan(dirarray)
 
-            print(len(flats), ' flats found.')
+            print(len(flats),  ' flats found.')
             print(len(biases), ' bias frames found.')
             print(len(lights), ' lights found')
-            if len(lights) > 0:
-                epoch = lights[0].header['DATE-OBS']
-                datestr = getDateString(epoch) # TODO import this
-                mjdstr  = str(np.round(Time(epoch, format='fits').mjd))
-            else:
-                raise Exception("No usable lights found") # NOTE user may want to run calibration files without lights, or have lights without calibration files
-
-            # Get Base Bias
-            if len(biases) > 0:
-                bias = self.mkBias(biases)
-            else:
-                bias = self.getBias(mjdstr) # find bias that are near in time
-                
-            # lets split the lights into filters
-            phi_list, phi_stacks = self._chkPhi(lights)
             
             # lets split the flats into filters
             flat = {}
             if len(flats) > 0:
                 phi_flat_list, phi_flat_stacks = self._chkPhi(flats)
+                print('Flat filters found : ', phi_flat_list)
                 for f in phi_flat_list:
+                    print('Making ', f, ' flat.')
                     flat[f] = self.mkFlat(phi_flat_stacks[f])
+            else:
+                phi_flat_list = [] # set empty array to check if lights filters are found in flat filters.
+            # Make the  Base Bias if possile
+            if len(biases) > 0:
+                bias = self.mkBias(biases)
+                
+            if len(lights) > 0:
+                epoch = lights[0].header['DATE-OBS']
+                datestr = getDateString(epoch) # TODO 
+                mjdstr  = str(int(np.round(Time(epoch, format='fits').mjd, 0)))
+            else:
+                raise Exception("No usable lights found") # NOTE user may want to run calibration files without lights, or have lights without calibration files
+
+            # Get Base Bias if none in raw
+            if len(biases) == 0:
+                bias = self.getBias(mjdstr) # find bias that are near in time
+                
+            # lets split the lights into filters
+            phi_list, phi_stacks = self._chkPhi(lights)
+            print('Light filters found : ', phi_list)
+        
             for phi in phi_list: # This is not a very stable section, needs some love later to handle niche cases
                 # find missing flats near in time to data
                 if phi not in phi_flat_list:
+                    # print('Retrieving ', phi, ' flat.')
                     phi_flat = self.getFlat(mjdstr, phi)
                     flat[phi] = phi_flat
             
@@ -335,14 +372,22 @@ class aico_reader(reader):
             for entry in contents:
                 if fname in entry.name:
                     save = False
-                    flat = CCDData.read(flatdir / fname) #, unit = Dorado.unit) ## NOTE edited
+                    flat = CCDDatax.read(flatdir / fname) #, unit = Dorado.unit) ## NOTE edited
             # TODO Allow RGB data
             
             
             if save:
-                c = ccdprocx.Combiner(flats)
-                c.sigma_clipping()
-                flat = c.median_combine()
+                import timeit
+                start = timeit.default_timer()
+                # from datetime import datetime
+                # start=datetime.now()
+                flat = ccdprocx.combine(flats, method='median', mem_limit=2e9, sigma_clip=True, dtype=np.int16)
+                stop = timeit.default_timer()
+                print('Time to stack ', filt, ' flats: ', stop - start)
+                # print datetime.now()-start
+                # c = ccdprocx.Combiner(flats)
+                # c.sigma_clipping()
+                # flat = c.median_combine()
                 # , method = 'average',
                 #                     sigma_clip = True, sigma_clip_low_thresh = 5, sigma_clip_high_thresh = 5,
                 #                     sigma_clip_func = np.ma.median, sigma_clip_dev_func = mad_std, unit = self.unit)
@@ -388,9 +433,9 @@ class aico_reader(reader):
             for entry in contents:
                 if fname in entry.name:
                     save = False
-                    bias = CCDData.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
+                    bias = CCDDatax.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
             if save:
-                bias = ccdprocx.combine(biasIFC, method = 'average') #, unit = Dorado.unit) ## NOTE edited
+                bias = ccdprocx.combine(biasIFC, method = 'average', mem_limit=2e9, dtype=np.int16) #, unit = Dorado.unit) ## NOTE edited
                 bias.meta['stacked'] = True
                 bias.header['numsubs'] = len(biasIFC)
                 # date = Time(bias.header['DATE-OBS'], format='fits').mjd
@@ -420,59 +465,72 @@ class aico_reader(reader):
         # TODO mod fplate to accept cr name
         if Dorado.ceres[Dorado.ceres_keys[cr]].datestr == None:
             Dorado.getDateString(cr) 
-        wrkdir = Dorado.dordir / 'data' / 'wrk'
+        # wrkdir = Dorado.dordir / 'data' / 'wrk'
 
         datestr = Dorado.ceres[Dorado.ceres_keys[cr]].datestr
-        print('Saved to data/wrk/', datestr)
+        print('Save to data/wrk/', datestr)
         Dorado.mkwrk(cr)
 
         if filters == None:
             filters = Dorado.ceres[Dorado.ceres_keys[cr]].filters.keys()
         
-        for filter in filters:
-            fildat = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
+        if type(filters) == type([]):
+            for phi in filters:
+                self._save_phi(cr, phi)
+        elif type(filters) == str:
+            self._save_phi(cr, filters)
+        else:
+            raise Exception('Cannot parse filter arguement. Did you enter the string of a single filter or a list of filter strings?')
+        
+    def _save_phi(self, cr, phi):
+        wrkdir  = Dorado.dordir / 'data' / 'wrk'
+        datestr = Dorado.ceres[Dorado.ceres_keys[cr]].datestr
+        fildat  = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[phi]]
+        
+        if (fildat.target == None):
+            fplate = str(int(Dorado.ceres[Dorado.ceres_keys[cr]].date.mjd)) + '-' + phi + '_'
+        else:
+            fplate = str(fildat.target.name) + '-' + str(int(Dorado.ceres[Dorado.ceres_keys[cr]].date.mjd)) + '-' + phi + '_' 
             
-            if (fildat.target == None):
-                fplate = str(int(Dorado.ceres[Dorado.ceres_keys[cr]].date.mjd)) + '-' + filter + '_'
-            else:
-                fplate = str(fildat.target.name) + '-' + filter + '_' 
-
-
-            if (fildat.calibrated == True) and (fildat.aligned == True): 
-                wrdir = wrkdir / datestr / 'aligned'
-                if len(filters) != 1:
-                    os.makedirs(wrkdir / datestr / 'aligned' / filter, exist_ok = True)
-                    wrdir = wrdir / filter
-                fsub = '_ca'
-            elif (fildat.calibrated == True):
-                wrdir = wrkdir / datestr / 'calibrated'
-                if len(filters) != 1:
-                    os.makedirs(wrkdir / datestr / 'calibrated' / filter, exist_ok = True)
-                    wrdir = wrdir / filter
-                fsub = '_c'
-            else: 
-                wrdir = wrkdir / datestr / 'uncalibrated'
-                if len(filters) != 1:
-                    os.makedirs(wrkdir / datestr / 'uncalibrated' / filter, exist_ok = True)
-                    wrdir = wrdir / filter
-                fsub = ''
-
-
-            if fildat.base != None:
-                fname = fplate + '_base.fits'
-                fildat.base.write(wrkdir / datestr / fname, overwrite = True)
-            if fildat.solved != None: 
-                fname = fplate + '_solved.fits'
-                fildat.solved.write(wrkdir / datestr / fname, overwrite = True)
-                
-
-
-            for p in range(len(fildat.data)):
-                image = fildat.data[p]
-                tstr = str(Time(image.header['DATE-OBS'], format='fits', out_subfmt='date_hms').value)
-                image.data = image.data.astype('uint16') 
-                fname = fplate + str(p) + '_' + tstr + fsub + '.fits'
-                image.write(wrdir / fname, overwrite = True)
+        if (fildat.calibrated == True) and (fildat.aligned == True): 
+            wrdir = wrkdir / datestr / 'aligned'
+            os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
+            wrdir = wrdir / phi
+            fsub = '_ca'
+        elif (fildat.aligned == True):
+            wrdir = wrkdir / datestr / 'aligned'
+            os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
+            wrdir = wrdir / phi
+            fsub = '_a'
+        elif (fildat.calibrated == True):
+            wrdir = wrkdir / datestr / 'calibrated'
+            os.makedirs(wrkdir / datestr / 'calibrated' / phi, exist_ok = True)
+            wrdir = wrdir / phi
+            fsub = '_c'
+        else: 
+            wrdir = wrkdir / datestr / 'uncalibrated'
+            os.makedirs(wrkdir / datestr / 'uncalibrated' / phi, exist_ok = True)
+            wrdir = wrdir / phi
+            fsub = ''
+        
+        if fildat.base != None:
+            fname = fplate + '_base.fits'
+            fildat.base.write(wrkdir / datestr / fname, overwrite = True)
+            
+        if fildat.solved != None: 
+            fname = fplate + '_solved.fits'
+            fildat.solved.write(wrkdir / datestr / fname, overwrite = True)
+            
+        for p in range(len(fildat.data)):
+            image = fildat.data[p]
+            tstr = str(Time(image.header['DATE-OBS'], format='fits', out_subfmt='date_hms').value)
+            image.data = image.data.astype('uint16') 
+            # image.mask = image.mask.astype('uint16') 
+            image.mask = None
+            image.uncertainty = None
+            # image.uncertainty = image.uncertainty.astype('uint16') 
+            fname = fplate + str(p) + '_' + tstr + fsub + '.fits'
+            image.write(wrdir / fname, overwrite = True)
 
     def getBias(self, mjdstr):
         # NOTE This function does not account for binning/image size
@@ -480,17 +538,20 @@ class aico_reader(reader):
         biasdir = Dorado.dordir / 'data' / 'bias' 
         contents = os.scandir(path = biasdir)
         candidates = []
+        # print(target_mjd)
         for entry in contents:
-            entry_mjd = int(entry.name[0:4]) # grab first five characters of filename. Should be the mjd number
+            entry_mjd = int(entry.name[0:5]) # grab first five characters of filename. Should be the mjd number
+            # print(entry_mjd)
             if np.abs(target_mjd - entry_mjd) <= self.calibration_window:
                 candidates.append(entry_mjd)
         if len(candidates) == 0:
             print('No viable bias frames found. Try increasing your calibration window.')
+            bias = None
         else:
-            mjd_to_use = candidates[np.argmin(candidates- entry_mjd)] #locate the mjd of the closest file in time
-        
-        fname = str(mjd_to_use) + '_Bias.fits'
-        bias = CCDData.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
+            mjd_to_use = candidates[np.argmin(np.array(candidates) - entry_mjd)] #locate the mjd of the closest file in time
+            print('Retrieved bias from mjd: ', mjd_to_use)
+            fname = str(mjd_to_use) + '_Bias.fits'
+            bias = CCDDatax.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
         return bias
     
     def getFlat(self, mjdstr, phi):
@@ -498,18 +559,21 @@ class aico_reader(reader):
         flatdir = Dorado.dordir / 'data' / 'flats' 
         contents = os.scandir(path = flatdir)
         candidates = []
+        # print(target_mjd)
         for entry in contents:
             if phi in entry.name:
-                entry_mjd = int(entry.name[0:4]) # grab first five characters of filename. Should be the mjd number
+                entry_mjd = int(entry.name[0:5]) # grab first five characters of filename. Should be the mjd number
+                # print(entry_mjd)
                 if np.abs(target_mjd - entry_mjd) <= self.calibration_window:
                     candidates.append(entry_mjd)
         if len(candidates) == 0:
-            print('No viable flat frames found. Try increasing your calibration window or using a different filter.')
+            print('No viable flat frames found for ', phi, '. Try increasing your calibration window or using a different filter.')
+            flat = None
         else:
-            mjd_to_use = candidates[np.argmin(candidates- entry_mjd)]
-        
-        fname = str(mjd_to_use) + '_' + str(phi) + '_flat.fits'
-        flat = CCDData.read(flatdir / fname) #, unit = Dorado.unit) ## NOTE edited
+            mjd_to_use = candidates[np.argmin(np.array(candidates) - entry_mjd)]
+            print('Retrieving ', phi, ' flat from mjd: ', mjd_to_use)
+            fname = str(mjd_to_use) + '_' + str(phi) + '_flat.fits'
+            flat = CCDDatax.read(flatdir / fname) #, unit = Dorado.unit) ## NOTE edited
         return flat
 
 # class tess_reader:
