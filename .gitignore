@@ -1,0 +1,9 @@
+
+*.log
+
+
+temp/
+dorado.egg-info/
+dist/
+build/
+*.eggs/
