@@ -6,6 +6,7 @@ from ..stack import Stack
 from ..core.readerClass import *
 from ..dorphot.dorphotClass import *
 from ..target.targetClass import *
+from ..core.cacheClass import *
 
 import ccdprocx
 
@@ -69,6 +70,7 @@ class Dorado_core:
         # redo this so theres an easy storage and readout
         # reader
         self.reader = aico_reader() # ussually we'd want to grab this from a configuration file, should name be aicoReader?
+        self.cache = cache_core()   # add cache handler to Dorado core instance
         # dorphot
         self.dorphot = aicoPhot()
         # ceres & stacks
@@ -354,6 +356,9 @@ class Dorado_core:
                 self.dorphot.getWCS(filter, self) # TODO this is now in dorphot, should it be moved?
             fname = str(filter) + '-solved.fits'
             solved = self.ceres[self.ceres_keys[cr]].data[self.ceres[self.ceres_keys[cr]].filters[filter]].solved
+            solved.data = solved.data.astype('uint16')
+            solved.mask = None
+            solved.uncertainty = None
             solved.write(wrkdir / datestr / 'WCS' / fname, overwrite = True)
         # not done might be redundant atm also shouldnt this belong to reader?
     
@@ -386,6 +391,11 @@ class Dorado_core:
             imname = filter + '_base.fits'
             fname = wrkdir / datestr / imname
             base = self.ceres[self.ceres_keys[cr]].data[self.ceres[self.ceres_keys[cr]].filters[filter]].base
+            base.data        = base.data.astype('uint16') 
+            # base.mask        = base.mask.astype('uint16')
+            # base.uncertainty = base.uncertainty.astype('uint16')
+            base.mask = None
+            base.uncertainty = None
             base.write(fname, overwrite = True)
         # not done might be redundant atm also shouldnt this belong to reader?
         
