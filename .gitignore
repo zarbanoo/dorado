@@ -5,6 +5,7 @@
 *.o
 *.so
 __pycache__
+*.pyc
 
 # Ignore .c files by default to avoid including generated code. If you want to
 # add a non-generated .c extension, use `git add -f filename.c`.
@@ -17,6 +18,7 @@ htmlcov
 .coverage
 MANIFEST
 .ipynb_checkpoints
+**/setuptools_scm
 
 # Sphinx
 docs/api
