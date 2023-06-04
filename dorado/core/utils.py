@@ -1,11 +1,21 @@
-from astropy.nddata.ccddata import CCDData
 from astroquery.astrometry_net import AstrometryNet
 from astroquery.exceptions  import TimeoutError
 from astropy.wcs import WCS
 
 ast = AstrometryNet()
 
-__all__ =  ['plate_solve', 'get_night', 'getDateString']
+__all__ =  ['plate_solve', 'get_night', 'getDateString', 'CCDDatax']
+
+from astropy.nddata.ccddata import CCDData
+CCDData._config_ccd_requires_unit = False
+import astropy.units as un
+
+CCDDatax = CCDData
+CCDDatax.unit = un.adu # this is what the kids call hardcoding and I'm doing it because astropy refuses to fix their godforsaken unit issue with CCDData
+# why did CCDData decide to randomly break? who knows
+# why did CCDData start refusing to achknowledge me telling it explicitely multiple times that it doesn't need a unit
+# because when I hand it a unit it ignores it and instead just reads it from the header? I don't know, does astropy team know?
+# probably not. But its a thing and I really wish it wasn't at this hour of the night.
 
 
 def plate_solve(dirarray, data = None, writearray = False):
@@ -26,12 +36,14 @@ def plate_solve(dirarray, data = None, writearray = False):
     """
     # TODO better handle cache from here and check if API key
     # can we print a summary of the solve?
-    path = Dorado.dordir
+    # path = Dorado.dordir
+    from pathlib import Path
+    path = Path()
     for dir in dirarray:
         path = path / dir
 
     if data == None:
-        data = CCDData.read(path) #, unit = Dorado.unit) ## NOTE edited
+        data = CCDDatax.read(path) #, unit = Dorado.unit) ## NOTE edited
 
     trying = True
     submission_id = None
@@ -59,7 +71,7 @@ def plate_solve(dirarray, data = None, writearray = False):
         wcs_hdu = data
         wcs_hdu.header = wcs_header
         if writearray:
-            path = Dorado.dordir
+            path = Path()
             for dir in writearray:
                 path = path / dir
             wcs_hdu.write(path, overwrite = True)
@@ -123,7 +135,7 @@ def get_night():
         
 from astropy.time import Time
 
-def getDateString(self, epoch, utc = None):
+def getDateString(epoch, utc = None):
     """
     getDateString computes the date string for the given ceres object. ceres time is represented
     in UTC while datestring is represented in local time. A UTC offset must be provided either by self.UTCoffest
@@ -148,28 +160,29 @@ def getDateString(self, epoch, utc = None):
     # Fall back to Dorado UTC offset if UTC offset is not provided
     if not (utc):
         utc = Dorado.UTCoffset
+    epdt = epoch.datetime
     # if the hour is less than the utc offset of the site then the utc date is one ahead of local time
-    if (epoch['hour'] + utc) < 0:
-        day = str(epoch['day'] - 1)
-        day2 = str(epoch['day'])
-        month = str(epoch['month'])
-        if (epoch['day'] - 1) < 10:
-            day = '0' + str(epoch['day'] - 1)
-        if epoch['day'] < 10:
-            day2 = '0' + str(epoch['day'])
-        if epoch['month'] < 10:
-            month = '0' + str(epoch['month'])
+    if (epdt.hour + utc) < 0:
+        day = str(epdt.day - 1)
+        day2 = str(epdt.day)
+        month = str(epdt.month)
+        if (epdt.day - 1) < 10:
+            day = '0' + str(epdt.day - 1)
+        if epdt.day < 10:
+            day2 = '0' + str(epdt.day)
+        if epdt.month < 10:
+            month = '0' + str(epdt.month)
 
     else: 
-        day = str(epoch['day'])
-        day2 = str(epoch['day'] + 1)
-        month = str(epoch['month'])
-        if epoch['day'] < 10:
-            day = '0' + str(epoch['day'])
-        if epoch['day'] < 9:
-            day2 = '0' + str(epoch['day'] + 1)
-        if epoch['month'] < 10:
-            month = '0' + str(epoch['month'])
+        day = str(epdt.day)
+        day2 = str(epdt.day + 1)
+        month = str(epdt.month)
+        if epdt.day < 10:
+            day = '0' + str(epdt.day)
+        if epdt.day < 9:
+            day2 = '0' + str(epdt.day + 1)
+        if epdt.month < 10:
+            month = '0' + str(epdt.month)
 
-    return str(epoch['year']) + '-' + month + '-' + day + '+' + day2
+    return str(epdt.year) + '-' + month + '-' + day + '+' + day2
     
