@@ -33,7 +33,7 @@ class reader:
         # should report to logger and read from config here
         # will this carry over to inherited classes?
         self.desired_datatype = 'uint16' # datatype to force onto images
-        
+
     def diread(self, dirarray):
         """
         diread intakes a filepath array and catalogues the contents by either 'is file' or 'is directory'
@@ -64,7 +64,7 @@ class reader:
                 if entry.is_dir():
                     directories.append(entry)
         return files, directories
-    
+
     def newdat(self):
         """
         newdat is an nfinished function that will scan the '$user/.dorado/data/raw' directory
@@ -79,7 +79,7 @@ class reader:
         """
         # find data that hasn't been processed yet
         print('searching for unprocessed data...')
-    
+
     def force16(self, hdu):
         """
         An unfinished convinience function for forcing the datatype of CCDData to be 16-bit instead of 32-bit
@@ -95,7 +95,7 @@ class reader:
         NOTE:: in the future this will handle arrays of data instead of single HDU's and will allow for specifying the bit datatype.
         """
         print('This function is not implemented yet. See mkBias() for example functionality.')
-    
+
 
 
 
@@ -112,13 +112,13 @@ class aico_reader(reader):
         self.unique_lights = True # whether to find lights by non calibration files (True) or via self.lightstr (False)
         self.require_cal = False  # whether calibration frames are essential, this should be dynamically set by the read calibration level
         self.calibration_window = 7
-        
+
     def _single_level(self, files):
         bias    = self._read_stack(files, 'bias')
         flats  = self._read_stack(files, 'flats')
         lights = self._read_stack(files, 'lights')
         return bias, flats, lights
-        
+
     def _multi_level_top(self, files, directories):
         biasdir = [s for s in directories if s.name in self.biasstr]
         # There should never be multiple bias directories; unless bias were taken with multiple binning settings or taken multiple times.
@@ -166,7 +166,7 @@ class aico_reader(reader):
                 f, _ = self.diread(d)
                 sub_files += self._read_stack(f, stack_type)
         return sub_files
-            
+
     def _read_stack(self, files, stack_type):
         if (stack_type == 'lights') & (self.unique_lights):
             stackstr = self.stack_types['bias'] + self.stack_types['flats'] # NOTE:: in the future this should be modded to include all non light stack types.
@@ -240,7 +240,7 @@ class aico_reader(reader):
             print('Multi directory level organization format detected.')
             # People need to adopt a standard way of saving stuff or I will go nuts trying to come up with all the different ways they can organize(or disorganize) their data.
             return self._multi_level_top(files, directories) # what if there is usable data in single level and we only search multi-level
-        
+
     def _chkPhi(self, stack_files):
         # sequence through headers saving every filter keyword
         phi_list = []
@@ -259,7 +259,7 @@ class aico_reader(reader):
 
     def _chkCal(self):
         pass
-    
+
     def mkceres(self,  date, sub = 'raw', target = None, calibrated = False, aligned = False):
             '''
             mkceres creates a ceres object from a given datestring for an observation and an optional 
@@ -347,7 +347,7 @@ class aico_reader(reader):
                 cere.add_stack(Stack(phi_stacks[phi], flat = flat[phi],  calibrated = calibrated, aligned = aligned, target = target))
                 
             return cere
-        
+
     def mkFlat(self, flats):
             """
             mkFlat takes  a list of flats to construct a calibrated flatfield image.
@@ -406,7 +406,7 @@ class aico_reader(reader):
                 print('Flat for filter and date already saved.')
 
             return flat
-        
+
     def mkBias(self, biasIFC):
             """
             mkBias takes a list of bias images to construct 
@@ -445,8 +445,8 @@ class aico_reader(reader):
             else:
                 print('Bias for date already saved.')
             return bias
-    
-    def savewrk(self, cr, filters = None):
+
+    def savewrk(self, cr, filters = None, save_series = True, save_base = True):
         """
         savewrk takes a ceres key and a list of filters to save and saves the desired data
         to the dorado working directory '$user/.dorado/data/wrk/'. 
@@ -476,13 +476,13 @@ class aico_reader(reader):
         
         if type(filters) == type([]):
             for phi in filters:
-                self._save_phi(cr, phi)
+                self._save_phi(cr, phi, save_series, save_base)
         elif type(filters) == str:
-            self._save_phi(cr, filters)
+            self._save_phi(cr, filters, save_series, save_base)
         else:
             raise Exception('Cannot parse filter arguement. Did you enter the string of a single filter or a list of filter strings?')
-        
-    def _save_phi(self, cr, phi):
+
+    def _save_phi(self, cr, phi, save_base, save_series):
         wrkdir  = Dorado.dordir / 'data' / 'wrk'
         datestr = Dorado.ceres[Dorado.ceres_keys[cr]].datestr
         fildat  = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[phi]]
@@ -492,45 +492,47 @@ class aico_reader(reader):
         else:
             fplate = str(fildat.target.name) + '-' + str(int(Dorado.ceres[Dorado.ceres_keys[cr]].date.mjd)) + '-' + phi + '_' 
             
-        if (fildat.calibrated == True) and (fildat.aligned == True): 
-            wrdir = wrkdir / datestr / 'aligned'
-            os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
-            wrdir = wrdir / phi
-            fsub = '_ca'
-        elif (fildat.aligned == True):
-            wrdir = wrkdir / datestr / 'aligned'
-            os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
-            wrdir = wrdir / phi
-            fsub = '_a'
-        elif (fildat.calibrated == True):
-            wrdir = wrkdir / datestr / 'calibrated'
-            os.makedirs(wrkdir / datestr / 'calibrated' / phi, exist_ok = True)
-            wrdir = wrdir / phi
-            fsub = '_c'
-        else: 
-            wrdir = wrkdir / datestr / 'uncalibrated'
-            os.makedirs(wrkdir / datestr / 'uncalibrated' / phi, exist_ok = True)
-            wrdir = wrdir / phi
-            fsub = ''
-        
-        if fildat.base != None:
-            fname = fplate + '_base.fits'
-            fildat.base.write(wrkdir / datestr / fname, overwrite = True)
-            
-        if fildat.solved != None: 
-            fname = fplate + '_solved.fits'
-            fildat.solved.write(wrkdir / datestr / fname, overwrite = True)
-            
-        for p in range(len(fildat.data)):
-            image = fildat.data[p]
-            tstr = str(Time(image.header['DATE-OBS'], format='fits', out_subfmt='date_hms').value)
-            image.data = image.data.astype('uint16') 
-            # image.mask = image.mask.astype('uint16') 
-            image.mask = None
-            image.uncertainty = None
-            # image.uncertainty = image.uncertainty.astype('uint16') 
-            fname = fplate + str(p) + '_' + tstr + fsub + '.fits'
-            image.write(wrdir / fname, overwrite = True)
+        if save_series:
+            if (fildat.calibrated == True) and (fildat.aligned == True): 
+                wrdir = wrkdir / datestr / 'aligned'
+                os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
+                wrdir = wrdir / phi
+                fsub = '_ca'
+            elif (fildat.aligned == True):
+                wrdir = wrkdir / datestr / 'aligned'
+                os.makedirs(wrkdir / datestr / 'aligned' / phi, exist_ok = True)
+                wrdir = wrdir / phi
+                fsub = '_a'
+            elif (fildat.calibrated == True):
+                wrdir = wrkdir / datestr / 'calibrated'
+                os.makedirs(wrkdir / datestr / 'calibrated' / phi, exist_ok = True)
+                wrdir = wrdir / phi
+                fsub = '_c'
+            else: 
+                wrdir = wrkdir / datestr / 'uncalibrated'
+                os.makedirs(wrkdir / datestr / 'uncalibrated' / phi, exist_ok = True)
+                wrdir = wrdir / phi
+                fsub = ''
+                
+            for p in range(len(fildat.data)):
+                image = fildat.data[p]
+                tstr = str(Time(image.header['DATE-OBS'], format='fits', out_subfmt='date_hms').value)
+                image.data = image.data.astype('uint16') 
+                # image.mask = image.mask.astype('uint16') 
+                image.mask = None
+                image.uncertainty = None
+                # image.uncertainty = image.uncertainty.astype('uint16') 
+                fname = fplate + str(p) + '_' + tstr + fsub + '.fits'
+                image.write(wrdir / fname, overwrite = True)
+                
+        if save_base:
+            if fildat.base != None:
+                fname = fplate + '_base.fits'
+                fildat.base.write(wrkdir / datestr / fname, overwrite = True)
+                
+            if fildat.solved != None: 
+                fname = fplate + '_solved.fits'
+                fildat.solved.write(wrkdir / datestr / fname, overwrite = True)
 
     def getBias(self, mjdstr):
         # NOTE This function does not account for binning/image size
@@ -553,7 +555,7 @@ class aico_reader(reader):
             fname = str(mjd_to_use) + '_Bias.fits'
             bias = CCDDatax.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
         return bias
-    
+
     def getFlat(self, mjdstr, phi):
         target_mjd = int(mjdstr)
         flatdir = Dorado.dordir / 'data' / 'flats' 
@@ -596,7 +598,7 @@ class aico_reader(reader):
 #             TSTART = hdulist[0].header['TSTART']
 #             TSTOP = hdulist[0].header['TSTOP']
 #             tidstr = 'TIC ' + str(tid)
-        
+
 #         cere = Ceres()
 #         # need to make a stack, and reconfigure the ceres class to be more generic in data storage. maybe make the dorphot function
 #         # a wrapper, or make the ability to produce a target pixel file of aico data.
