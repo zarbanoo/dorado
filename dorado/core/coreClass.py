@@ -109,19 +109,19 @@ class Dorado_core:
         
         """
         self.enter_dordir()
-        os.makedirs('./data/wrk', exist_ok = True)
-        os.makedirs('./data/flats', exist_ok = True)
-        os.makedirs('./data/bias', exist_ok = True)
-        os.makedirs('./data/darks', exist_ok = True)
-        os.makedirs('./data/raw', exist_ok = True)
-        os.makedirs('./data/graphical', exist_ok = True)
-        os.makedirs('./data/projects', exist_ok = True)
-        os.makedirs('./data/targets', exist_ok = True)
-        os.makedirs('./logs', exist_ok = True)
-        os.makedirs('./cache', exist_ok = True)
+        os.makedirs('./data/wrk',            exist_ok = True)
+        os.makedirs('./data/flats',          exist_ok = True)
+        os.makedirs('./data/bias',           exist_ok = True)
+        os.makedirs('./data/darks',          exist_ok = True)
+        os.makedirs('./data/raw',            exist_ok = True)
+        os.makedirs('./data/graphical',      exist_ok = True)
+        os.makedirs('./data/projects',       exist_ok = True)
+        os.makedirs('./data/targets',        exist_ok = True)
+        os.makedirs('./logs',                exist_ok = True)
+        os.makedirs('./cache',               exist_ok = True)
         os.makedirs('./cache/astrometryNet', exist_ok = True)
         if tess:
-            os.makedirs('./data/tess', exist_ok = True)
+            os.makedirs('./data/tess',       exist_ok = True)
         self.exit_dordir()
         
     def enter_dordir(self):
