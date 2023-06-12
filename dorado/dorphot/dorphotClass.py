@@ -102,7 +102,7 @@ class aicoPhot:
         # add more flags for header
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].data = c_series
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].calibrated = True
-        
+
     def imarith(self, cr, filter, operator, operand):
         '''
         imarith is a basic replication of the IRAF image arithmatic tool imarith.
@@ -131,7 +131,6 @@ class aicoPhot:
                 series[i].data = series[i].data  * operand
         
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]] = series
-        
 
     def getWCS(self, cr, filter, alignto = None, cache = True):
         '''
@@ -168,7 +167,7 @@ class aicoPhot:
             Dorado.delcacheObj( fname, 'astrometryNet')
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(wcs_header)
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = solved
-    
+
     def align(self, cr, filter, alignto = None, getWCS = True, cache = False, ds = 2, ma = 5, clear_cache = True):
         '''
         align aligns a filter stack within a specified ceres object to a specified frame (default is first
@@ -241,14 +240,14 @@ class aicoPhot:
 
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].data = aa_series
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].aligned = True
-    
+
     def differential_magnitude(self, flux1, flux2, mag2):
         '''
         Probably could use target class inputs and uncertainties
         '''
         mag1 = -2.5 * np.log10(flux1/flux2) + mag2
         return mag1
-        
+
     def apPhot(self, cr, filter, toid, control_toid = None, shape = 21, unc = 0.1):
         '''
         apPhot performs basic aperture photometry based on photutils.aperture_photometry on a target
@@ -343,7 +342,6 @@ class aicoPhot:
         Dorado.targets[Dorado.target_keys[toid]].ts.append(ts) 
         # TODO accomodate targets embedded in core (list of targets)
         # TODO the name for this function needs updating
-        
     def mkBase(self, cr, filter, sigClip = False, minmax = False, mmcmip = 0.1, mmcmap = 0.9):
         '''
         mkBase stacks filter data within a ceres object to produce a base or 'average' stacked image.
@@ -381,8 +379,6 @@ class aicoPhot:
 
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].base = base
         ## TODO :: sort out what is in the header of this base file.
-
-        
     def calBase(self, cr, filter):
         '''
         calBase calibrates a base image for a stack by computing a 2D background for the image
