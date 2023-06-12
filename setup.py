@@ -38,7 +38,7 @@ directly with::
 
 For more information, see:
 
-  http://docs.astropy.org/en/latest/development/testguide.html#running-tests
+    http://docs.astropy.org/en/latest/development/testguide.html#running-tests
 """
 
 if 'test' in sys.argv:
@@ -63,7 +63,7 @@ You can also build the documentation with Sphinx directly using::
 
 For more information, see:
 
-  http://docs.astropy.org/en/latest/install.html#builddocs
+    http://docs.astropy.org/en/latest/install.html#builddocs
 """
 
 if 'build_docs' in sys.argv or 'build_sphinx' in sys.argv:
@@ -82,7 +82,7 @@ except Exception:
 """.lstrip()
 
 setup(
-    version='2.0.0.dev42'
+    version='2.0.0.dev44'
     # use_scm_version={
     #     'write_to': os.path.join('dorado', 'version.py'),
     #     'write_to_template': VERSION_TEMPLATE,
