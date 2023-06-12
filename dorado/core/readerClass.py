@@ -65,9 +65,9 @@ class reader:
                     directories.append(entry)
         return files, directories
 
-    def newdat(self):
+    def newdat(self, only_new = True, handback = True, print_out = True):
         """
-        newdat is an nfinished function that will scan the '$user/.dorado/data/raw' directory
+        newdat is an unfinished function that will scan the '$user/.dorado/data/raw' directory
         for new data to be processed.
         
         Parameters
@@ -77,8 +77,22 @@ class reader:
         -------
         
         """
-        # find data that hasn't been processed yet
-        print('searching for unprocessed data...')
+        # scan data directories
+        _, raw_directories = self.diread(['data', 'raw'])
+        _, wrk_directories = self.diread(['data', 'wrk'])
+        datdirs = []
+        if only_new:
+            for d in raw_directories:
+                if d.name not in [w.name for w in wrk_directories]:
+                    datdirs.append(d)
+        else:
+            datdirs = raw_directories
+        if print_out:
+            print('Data directories found: \n')
+            for d in datdirs:
+                print('-----| ' + d.name + ' \n')
+        if handback:
+            return datdirs
 
     def force16(self, hdu):
         """
