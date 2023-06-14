@@ -395,7 +395,7 @@ class aico_reader(reader):
                 start = timeit.default_timer()
                 # from datetime import datetime
                 # start=datetime.now()
-                flat = ccdprocx.combine(flats, method='median', mem_limit=2e9, sigma_clip=True, dtype=np.int16)
+                flat = ccdprocx.combine(flats, method='median', mem_limit=2e9, sigma_clip=True)
                 stop = timeit.default_timer()
                 print('Time to stack ', filt, ' flats: ', stop - start)
                 # print datetime.now()-start
@@ -449,7 +449,7 @@ class aico_reader(reader):
                     save = False
                     bias = CCDDatax.read(biasdir / fname) #, unit = Dorado.unit) ## NOTE edited
             if save:
-                bias = ccdprocx.combine(biasIFC, method = 'average', mem_limit=2e9, dtype=np.int16) #, unit = Dorado.unit) ## NOTE edited
+                bias = ccdprocx.combine(biasIFC, method = 'average', mem_limit=2e9) #, unit = Dorado.unit) ## NOTE edited
                 bias.meta['stacked'] = True
                 bias.header['numsubs'] = len(biasIFC)
                 # date = Time(bias.header['DATE-OBS'], format='fits').mjd
