@@ -82,7 +82,7 @@ except Exception:
 """.lstrip()
 
 setup(
-    version='2.0.0.dev44'
+    version='2.0.0.dev52'
     # use_scm_version={
     #     'write_to': os.path.join('dorado', 'version.py'),
     #     'write_to_template': VERSION_TEMPLATE,
