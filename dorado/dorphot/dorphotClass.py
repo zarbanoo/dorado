@@ -69,18 +69,21 @@ class aicoPhot:
         scln_xy: array
             array of position values for line cropping. [xmin, xmax, ymin, ymax]. Default is [1, -1, 1, -1]
         '''
+        print('\n|  Calibration  |')
         # for bla in series: add bias corrected = True to header
         stack = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
         flat = stack.flat
         bias = Dorado.ceres[Dorado.ceres_keys[cr]].bias
         c_series = []
 
-        print('Calibrating')
+        
         if use_lac_cr_removal:
-                try:
-                    import ccdproc
-                except Exception:
-                    print('Failed to open ccdproc. Is it installed?')
+            print('Using lacosmic cosmic ray removal')
+            try:
+                import ccdproc
+            except Exception:
+                print('Failed to open ccdproc. Is it installed?')
+        print('Calibrating')
         for im in tqdm(stack.data, colour = 'green'):
             # bar.update()
             im.data   = im.data.astype('uint16') 
@@ -97,11 +100,12 @@ class aicoPhot:
                 im == ccdproc.cosmicray_lacosmic(im)
             im.data        = im.data.astype('uint16') 
             im.mask        = im.mask.astype('uint16') 
-            im.uncertainty = im.uncertainty.astype('uint16') 
+            # im.uncertainty = im.uncertainty.astype('uint16') 
             c_series.append(im)
         # add more flags for header
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].data = c_series
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].calibrated = True
+        print('\n')
 
     def imarith(self, cr, filter, operator, operand):
         '''
@@ -131,7 +135,6 @@ class aicoPhot:
                 series[i].data = series[i].data  * operand
         
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]] = series
-
     def getWCS(self, cr, filter, alignto = None, cache = True):
         '''
         getWCS obtains WCS information for an image either via previously solved data in the cache or
@@ -167,8 +170,7 @@ class aicoPhot:
             Dorado.delcacheObj( fname, 'astrometryNet')
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(wcs_header)
             Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = solved
-
-    def align(self, cr, filter, alignto = None, getWCS = True, cache = False, ds = 2, ma = 5, clear_cache = True):
+    def align(self, cr, filter, alignto = None, getWCS = True, cache = False, ds = 3, ma = 21, mcp = 70):
         '''
         align aligns a filter stack within a specified ceres object to a specified frame (default is first
         frame). align can optionally retrieve the corresponding WCS data for the aligned stack.
@@ -190,7 +192,10 @@ class aicoPhot:
             Sets the detection sigma value for astroalign.register. Default is 2.
         ma: int or float
             Sets the minimum area value for astroalign.register. Default is 5.
+        mcp: int
+            maximum control points to use in finding transformation. Default is 50.
         '''
+        print('\n|  Alignment  |')
         series = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
         
         if alignto == None:
@@ -201,20 +206,20 @@ class aicoPhot:
         ## TODO :: make this use ceres.getWCS()
         if getWCS:
             if cache:
+                print('Obtaining WCS: from cache')
                 toalign =  CCDData.read(Dorado.dordir / 'cache' / 'astrometryNet' / 'solved.fits') #, unit = Dorado.unit)
                 hdulist = fits.open(Dorado.dordir / 'cache' / 'astrometryNet' / 'solved.fits') 
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(hdulist[0].header, hdulist)
                 hdulist.close()
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = toalign
             else:
+                print('Obtaining WCS: from nova.astrometry.net')
                 fname, cachedir = Dorado.cache.mkcacheObj(toalign, 'astrometryNet')
                 path = [cachedir, fname]
                 writearray = [cachedir, 'solved.fits']
                 from ..core.utils import plate_solve
                 solved, wcs_header = plate_solve(path, writearray = writearray)
                 toalign = solved
-                if clear_cache:
-                    Dorado.cache.delcacheObj( fname, 'astrometryNet')
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].wcs = WCS(wcs_header)
                 Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].solved = solved
                 # delete cache object
@@ -227,7 +232,7 @@ class aicoPhot:
         for image in tqdm(series.data, colour = 'green'):
             # bar.update()
             try:
-                img, _ = aa.register(image.data, toalign.data, detection_sigma = ds, min_area = ma)
+                img, _ = aa.register(image.data, toalign.data, detection_sigma = ds, min_area = ma, max_control_points = mcp)
                 aaim = image
                 aaim.data = img
                 aa_series.append(aaim)
@@ -237,17 +242,17 @@ class aicoPhot:
         if len(skipped) != 0:
             print(len(skipped), ' images skipped.')
             ## TODO :: need to redo times and such for less ims
+            ## TODO :: what to do with skipped images
 
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].data = aa_series
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].aligned = True
-
+        print('\n')
     def differential_magnitude(self, flux1, flux2, mag2):
         '''
         Probably could use target class inputs and uncertainties
         '''
         mag1 = -2.5 * np.log10(flux1/flux2) + mag2
         return mag1
-
     def apPhot(self, cr, filter, toid, control_toid = None, shape = 21, unc = 0.1):
         '''
         apPhot performs basic aperture photometry based on photutils.aperture_photometry on a target
@@ -269,6 +274,7 @@ class aicoPhot:
         unc: float
 
         '''
+        print('\n|  Photometry  |')
         # TODO this needs a better name
         # TODO get seeing from PSF
         stack = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
@@ -342,6 +348,7 @@ class aicoPhot:
         Dorado.targets[Dorado.target_keys[toid]].ts.append(ts) 
         # TODO accomodate targets embedded in core (list of targets)
         # TODO the name for this function needs updating
+        print('\n')
     def mkBase(self, cr, filter, sigClip = False, minmax = False, mmcmip = 0.1, mmcmap = 0.9):
         '''
         mkBase stacks filter data within a ceres object to produce a base or 'average' stacked image.
@@ -357,10 +364,14 @@ class aicoPhot:
         minmax: boolean
 
         '''
+        print('\n|  Stacking  |')
+        import time
+        start_time = time.time()
         ## TODO :: add the option to change the combination method. Right now default is 
         # sigma clipped median combination.
+        ## TODO :: rescale images before combine?
         series = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]]
-        mi, ma = np.min(series.data[0]), np.max(series.data[0])
+        mi, ma = np.min(series.data[0].data), np.max(series.data[0].data)
         di = ma - mi
         mmcmi, mmcma = mi + (mmcmip * di), ma + (mmcmap * di)
         # toalign = series.data[series.alignTo]
@@ -376,11 +387,15 @@ class aicoPhot:
         base.header['numsubs'] = len(series.data)
         base.header['DATE-OBS'] = series.data[0].header['DATE-OBS']
         base.header['filter'] = series.filter
+        # TODO :: add WCS to header
 
         Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[filter]].base = base
         ## TODO :: sort out what is in the header of this base file.
+        print("--- Combination time : %s ---" % (time.time() - start_time))
+        print('\n')
     def calBase(self, cr, filter):
         '''
+        NOTE:: Do not use, needs work to prevent absolutely trashing image.
         calBase calibrates a base image for a stack by computing a 2D background for the image
         and removing it from the base image.
         
