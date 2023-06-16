@@ -178,7 +178,7 @@ class Dorado_core:
             # TODO handle if no date found either
             print('No series nickname given, defaulting to date string: ', name)
         else:
-            print('Call series as: ', name)
+            print('Call series as: ', name, '\n')
         self.ceres_keys[name] = len(self.ceres)
         self.ceres.append(ctemp)
     
@@ -200,7 +200,7 @@ class Dorado_core:
         self.target_keys[name] = len(self.targets)
         self.targets.append(constructor(name))
         
-    def savewrk(self, cr, filters = None):
+    def savewrk(self, cr, filters = None, save_series = True, save_base = True):
         """
         savewrk is a wrapper function for self.reader.savewrk.
         Parameters
@@ -211,7 +211,7 @@ class Dorado_core:
         -------
         
         """
-        self.reader.savewrk(cr, filters)
+        self.reader.savewrk(cr, filters, save_series, save_base)
 
     # logic to set reader and dorphot
         
@@ -318,11 +318,11 @@ class Dorado_core:
             self.getDateString(cr) 
         datestr = self.ceres[self.ceres_keys[cr]].datestr
         wrkdir = self.dordir / 'data' / 'wrk'
-        os.makedirs(wrkdir / datestr, exist_ok = True)
-        os.makedirs(wrkdir / datestr / 'aligned', exist_ok = True)
-        os.makedirs(wrkdir / datestr / 'calibrated', exist_ok = True)
+        os.makedirs(wrkdir / datestr,                  exist_ok = True)
+        os.makedirs(wrkdir / datestr / 'aligned',      exist_ok = True)
+        os.makedirs(wrkdir / datestr / 'calibrated',   exist_ok = True)
         os.makedirs(wrkdir / datestr / 'uncalibrated', exist_ok = True)
-        os.makedirs(wrkdir / datestr / 'WCS', exist_ok = True)
+        os.makedirs(wrkdir / datestr / 'WCS',          exist_ok = True)
         # figures, targets, log, omitted images, observation metadata
 
     # move to utils or reader
