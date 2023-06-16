@@ -77,6 +77,7 @@ class reader:
         -------
         
         """
+        print('\n|  Data Scan  |')
         # scan data directories
         _, raw_directories = self.diread(['data', 'raw'])
         _, wrk_directories = self.diread(['data', 'wrk'])
@@ -299,7 +300,7 @@ class aico_reader(reader):
                 sets whether the imported images are aligned and within an 'aligned'
                 folder. Default is False.
             '''
-            
+            print('\n|  Reading  |')
             # TODO needs ability to handle multifilter directories
             # TODO auto handle setting 'wrk' as subfolder
             # TODO ignore looking for calibration files if calibrated or aligned 
@@ -360,6 +361,7 @@ class aico_reader(reader):
             for phi in phi_list:
                 cere.add_stack(Stack(phi_stacks[phi], flat = flat[phi],  calibrated = calibrated, aligned = aligned, target = target))
                 
+            print('\n')
             return cere
 
     def mkFlat(self, flats):
@@ -476,6 +478,7 @@ class aico_reader(reader):
         -------
         
         """
+        print('\n|  Saving  |')
         # TODO mod fplate to accept cr name
         if Dorado.ceres[Dorado.ceres_keys[cr]].datestr == None:
             Dorado.getDateString(cr) 
@@ -495,8 +498,9 @@ class aico_reader(reader):
             self._save_phi(cr, filters, save_series, save_base)
         else:
             raise Exception('Cannot parse filter arguement. Did you enter the string of a single filter or a list of filter strings?')
+        print('\n')
 
-    def _save_phi(self, cr, phi, save_base, save_series):
+    def _save_phi(self, cr, phi, save_series, save_base):
         wrkdir  = Dorado.dordir / 'data' / 'wrk'
         datestr = Dorado.ceres[Dorado.ceres_keys[cr]].datestr
         fildat  = Dorado.ceres[Dorado.ceres_keys[cr]].data[Dorado.ceres[Dorado.ceres_keys[cr]].filters[phi]]
